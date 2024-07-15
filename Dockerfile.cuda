@@ -2,13 +2,13 @@ FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04
 # `ffmpeg` is installed because without it `gradio` won't work with mp3(possible others as well) files
 # hadolint ignore=DL3008,DL3015,DL4006
 RUN apt-get update && \
-    apt-get install -y ffmpeg software-properties-common && \
+    apt-get install -y ffmpeg software-properties-common git && \
     add-apt-repository ppa:deadsnakes/ppa && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.12 python3.12-distutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /root/faster-whisper-server
-COPY requirements.txt .
+COPY requirements-all.txt ./requirements.txt
 RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/bin/uv \
     uv pip install --system --python 3.12 --no-cache -r requirements.txt
 COPY ./faster_whisper_server ./faster_whisper_server
