@@ -265,8 +265,56 @@ def transcribe_file(
         return segments_to_streaming_response(segments, transcription_info, response_format)
     else:
         return segments_to_response(segments, transcription_info, response_format)
+    
 
+# https://platform.openai.com/docs/api-reference/audio/createTranscription
+# https://github.com/openai/openai-openapi/blob/master/openapi.yaml#L8915
+@app.post(
+    "/v1/audio/newtonTranscriptions",
+    response_model=str | TranscriptionJsonResponse | TranscriptionVerboseJsonResponse,
+)
+def transcribe_file_newton(
+    file: Annotated[UploadFile, Form()],
+    model: Annotated[ModelName, Form()] = config.whisper.model,
+    language: Annotated[Language | None, Form()] = config.default_language,
+    prompt: Annotated[str | None, Form()] = None,
+    response_format: Annotated[ResponseFormat, Form()] = config.default_response_format,
+    temperature: Annotated[float, Form()] = 0.0,
+    timestamp_granularities: Annotated[
+        list[Literal["segment", "word"]],
+        Form(alias="timestamp_granularities[]"),
+    ] = ["word"],
+    stream: Annotated[bool, Form()] = False,
+    hotwords: Annotated[str | None, Form()] = None,
+) -> str | TranscriptionJsonResponse | TranscriptionVerboseJsonResponse | StreamingResponse:
+    whisper = load_model(model)
+    segments, transcription_info = whisper.transcribe(
+        file.file,
+        task=Task.TRANSCRIBE,
+        language=language,
+        initial_prompt=prompt,
+        word_timestamps="word" in timestamp_granularities,
+        temperature=temperature,
+        vad_filter=True,
+        hotwords=hotwords,
+    )
+    print("Newtont transcription")
+    print(f"filename: {file.filename}")
+    print(f"model: {model}")
+    print(f"language: {language}")
+    print(f"response_format: {response_format}")
+    print(f"prompt: {prompt}")
+    print(f"temperature: {temperature}")
+    print(f"timestamp_granularities: {timestamp_granularities}")
+    print(f"stream: {stream}")
+    print(f"hotwords: {hotwords}")
 
+    if stream:
+        return segments_to_streaming_response(segments, transcription_info, response_format)
+    else:
+        return segments_to_response(segments, transcription_info, response_format)
+    
+    
 async def audio_receiver(ws: WebSocket, audio_stream: AudioStream) -> None:
     try:
         while True:
