@@ -298,16 +298,16 @@ def transcribe_file_newton(
         vad_filter=True,
         hotwords=hotwords,
     )
-    print("Newtont transcription")
-    print(f"filename: {file.filename}")
-    print(f"model: {model}")
-    print(f"language: {language}")
-    print(f"response_format: {response_format}")
-    print(f"prompt: {prompt}")
-    print(f"temperature: {temperature}")
-    print(f"timestamp_granularities: {timestamp_granularities}")
-    print(f"stream: {stream}")
-    print(f"hotwords: {hotwords}")
+    logger.info("Newtont transcription")
+    logger.info(f"filename: {file.filename}")
+    logger.info(f"model: {model}")
+    logger.info(f"language: {language}")
+    logger.info(f"response_format: {response_format}")
+    logger.info(f"prompt: {prompt}")
+    logger.info(f"temperature: {temperature}")
+    logger.info(f"timestamp_granularities: {timestamp_granularities}")
+    logger.info(f"stream: {stream}")
+    logger.critical(f"hotwords: {hotwords}")
 
     if stream:
         return segments_to_streaming_response(segments, transcription_info, response_format)
