@@ -167,7 +167,7 @@ def segments_to_response(
 
 
 def format_as_sse(data: str) -> str:
-    return f"data: {data}\n\n"
+    return f"{data}\n"
 
 
 def segments_to_streaming_response(
