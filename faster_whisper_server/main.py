@@ -279,7 +279,6 @@ def transcribe_file_newton(
     language: Annotated[Language | None, Form()] = config.default_language,
     prompt: Annotated[str | None, Form()] = None,
     response_format: Annotated[ResponseFormat, Form()] = config.default_response_format,
-    temperature: Annotated[float, Form()] = 0.0,
     timestamp_granularities: Annotated[
         list[Literal["segment", "word"]],
         Form(alias="timestamp_granularities[]"),
@@ -294,20 +293,9 @@ def transcribe_file_newton(
         language=language,
         initial_prompt=prompt,
         word_timestamps="word" in timestamp_granularities,
-        temperature=temperature,
         vad_filter=True,
         hotwords=hotwords,
     )
-    logger.info("Newtont transcription")
-    logger.info(f"filename: {file.filename}")
-    logger.info(f"model: {model}")
-    logger.info(f"language: {language}")
-    logger.info(f"response_format: {response_format}")
-    logger.info(f"prompt: {prompt}")
-    logger.info(f"temperature: {temperature}")
-    logger.info(f"timestamp_granularities: {timestamp_granularities}")
-    logger.info(f"stream: {stream}")
-    logger.critical(f"hotwords: {hotwords}")
 
     if stream:
         return segments_to_streaming_response(segments, transcription_info, response_format)
