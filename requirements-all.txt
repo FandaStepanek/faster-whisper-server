@@ -103,7 +103,8 @@ fastapi-cli==0.0.4
     # via fastapi
 faster-whisper==1.0.3
     # via faster-whisper-server (pyproject.toml)
-ffmpy==0.3.2
+# ffmpy is commented because setuptools 72.0.0 version is bugged - uncomment when is fixed
+#ffmpy==0.3.2
     # via gradio
 filelock==3.15.1
     # via
@@ -494,7 +495,8 @@ scipy==1.13.1
     # via aider-chat
 semantic-version==2.10.0
     # via gradio
-setuptools==70.2.0
+# uncomment when setuptools 72.0.0 is fixed
+#setuptools==70.2.0
     # via ctranslate2
 shellingham==1.5.4
     # via typer

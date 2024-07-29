@@ -9,6 +9,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /root/faster-whisper-server
 COPY requirements-all.txt ./requirements.txt
+# sepparate install because setuptools version 72.0.0 broke ffmpy - remove here and uncomment in requirements.txt when fixed
+RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/bin/uv \
+    uv pip install --system --python 3.12 --no-cache setuptools==70.2.0 "git+https://github.com/EuDs63/ffmpy.git"
 RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/bin/uv \
     uv pip install --system --python 3.12 --no-cache -r requirements.txt
 COPY ./faster_whisper_server ./faster_whisper_server
