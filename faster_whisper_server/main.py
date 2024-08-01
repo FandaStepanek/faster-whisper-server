@@ -177,11 +177,6 @@ def segments_to_streaming_response(
 ) -> StreamingResponse:
     def segment_responses() -> Generator[str, None, None]:
         for segment in segments:
-            if not segment.text.endswith('.'):
-                segment.text += '.'
-            if not segment.words[-1].word.endswith('.'):
-                segment.words[-1].word += '.'
-
             if response_format == ResponseFormat.TEXT:
                 data = segment.text
             elif response_format == ResponseFormat.JSON:
