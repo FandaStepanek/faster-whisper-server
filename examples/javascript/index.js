@@ -82,7 +82,7 @@ async function translateFile(filePath, model, responseFormat, temperature) {
  * @param {string} temperature - Temperature setting
  */
 async function sendAudioOverWebSocket(filePath, model, language, responseFormat, temperature) {
-    const wsUrl = `ws://100.105.162.69:8000/v1/audio/transcriptions?model=${encodeURIComponent(model)}&language=${encodeURIComponent(language)}&response_format=${encodeURIComponent(responseFormat)}&temperature=${encodeURIComponent(temperature)}`;
+    const wsUrl = `ws://144.76.201.178:8888/v1/audio/transcriptions?model=${encodeURIComponent(model)}&language=${encodeURIComponent(language)}&response_format=${encodeURIComponent(responseFormat)}&temperature=${encodeURIComponent(temperature)}`;
     const ws = new WebSocket(wsUrl);
 
     ws.on('open', async () => {
@@ -135,22 +135,22 @@ async function convertToPcm(filePath) {
 
 async function main() {
     const model = 'Systran/faster-whisper-large-v3';
-    const language = 'en';
-    const responseFormat = 'json';
+    const language = 'cs';
+    const responseFormat = 'verbose_json';
     const temperature = '0';
-    const filePath = './path/to/your/audio.webm';  // Replace with the actual file path
+    const filePath = 'C:\\Users\\StepanekFrantisek\\source\\workspace\\testData\\teckovani.mp4';  // Replace with the actual file path
 
     // Convert the audio file to PCM format
-    const pcmFilePath = await convertToPcm(filePath);
+    //const pcmFilePath = await convertToPcm(filePath);
 
     // Transcribe the audio file using the HTTP endpoint
-    await transcribeFile(pcmFilePath, model, language, responseFormat, temperature);
+    //await transcribeFile(pcmFilePath, model, language, responseFormat, temperature);
 
     // Translate the audio file using the HTTP endpoint
-    await translateFile(pcmFilePath, model, responseFormat, temperature);
+    //await translateFile(pcmFilePath, model, responseFormat, temperature);
 
     // Transcribe the audio file using the WebSocket endpoint
-    await sendAudioOverWebSocket(pcmFilePath, model, language, responseFormat, temperature);
+    await sendAudioOverWebSocket(filePath, model, language, responseFormat, temperature);
 }
 
 // Make sure to use ffmpeg version 7 or above. The default apt-get install only installs version 4.x. Also, Ubuntu 22.04 or above is required to support version 7.x.

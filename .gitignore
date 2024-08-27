@@ -169,3 +169,8 @@ tests/data
 .secrets
 .ruff_cache
 .aider*
+
+# newton addition
+/examples/javascript/node_modules*
+/examples/javascript/package-lock.json
+/examples/javascript/package.json
