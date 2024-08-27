@@ -199,7 +199,7 @@ class Config(BaseSettings):
     """
     Maximum number of models that can be loaded at a time.
     """
-    max_no_data_seconds: float = 100.0
+    max_no_data_seconds: float = 2.0
     """
     Max duration to wait for the next audio chunk before transcription is finilized and connection is closed.
     """
@@ -208,11 +208,11 @@ class Config(BaseSettings):
     Minimum duration of an audio chunk that will be transcribed.
     """
     word_timestamp_error_margin: float = 0.2
-    max_inactivity_seconds: float = 100.5
+    max_inactivity_seconds: float = 2.5
     """
     Max allowed audio duration without any speech being detected before transcription is finilized and connection is closed.
     """  # noqa: E501
-    inactivity_window_seconds: float = 105.0
+    inactivity_window_seconds: float = 5.0
     """
     Controls how many latest seconds of audio are being passed through VAD.
     Should be greater than `max_inactivity_seconds`
