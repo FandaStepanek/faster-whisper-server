@@ -203,16 +203,16 @@ class Config(BaseSettings):
     """
     Max duration to wait for the next audio chunk before transcription is finilized and connection is closed.
     """
-    min_duration: float = 1.0
+    min_duration: float = 10.0
     """
     Minimum duration of an audio chunk that will be transcribed.
     """
     word_timestamp_error_margin: float = 0.2
-    max_inactivity_seconds: float = 2.5
+    max_inactivity_seconds: float = 100.5
     """
     Max allowed audio duration without any speech being detected before transcription is finilized and connection is closed.
     """  # noqa: E501
-    inactivity_window_seconds: float = 5.0
+    inactivity_window_seconds: float = 105.0
     """
     Controls how many latest seconds of audio are being passed through VAD.
     Should be greater than `max_inactivity_seconds`

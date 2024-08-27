@@ -380,10 +380,10 @@ async def transcribe_stream(
         "vad_filter": True,
         "condition_on_previous_text": False,
     }
-    print(transcribe_opts)
-    print(language)
-    print(response_format)
-    print(model)
+    logger.debug(transcribe_opts)
+    logger.debug(language)
+    logger.debug(response_format)
+    logger.debug(model)
     
 
 
