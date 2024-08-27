@@ -199,7 +199,7 @@ class Config(BaseSettings):
     """
     Maximum number of models that can be loaded at a time.
     """
-    max_no_data_seconds: float = 1.0
+    max_no_data_seconds: float = 10.0
     """
     Max duration to wait for the next audio chunk before transcription is finilized and connection is closed.
     """
