@@ -380,6 +380,13 @@ async def transcribe_stream(
         "vad_filter": True,
         "condition_on_previous_text": False,
     }
+    print(transcribe_opts)
+    print(language)
+    print(response_format)
+    print(model)
+    
+
+
     whisper = load_model(model)
     asr = FasterWhisperASR(whisper, **transcribe_opts)
     audio_stream = AudioStream()
