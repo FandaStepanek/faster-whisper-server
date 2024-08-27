@@ -12,7 +12,7 @@ services:
       - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
     ports:
-      - 8000:8000
+      - 8888:8888
     develop:
       watch:
         - path: faster_whisper_server
