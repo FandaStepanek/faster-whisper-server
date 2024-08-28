@@ -377,7 +377,7 @@ async def transcribe_stream(
     transcribe_opts = {
         "language": language,
         "temperature": temperature,
-        "vad_filter": True,
+        "vad_filter": False,
         "condition_on_previous_text": False,
     }
     logger.debug(transcribe_opts)
