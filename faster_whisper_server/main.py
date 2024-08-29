@@ -317,7 +317,7 @@ def transcribe_file_newton(
     ] = ["word"],
     stream: Annotated[bool, Form()] = False,
     hotwords: Annotated[str | None, Form()] = None,
-    repetition_penalty: Annotated[float | None, Form()] = None,
+    repetition_penalty: Annotated[float, Form()] = 1,
     no_repeat_ngram_size: Annotated[int, Form()] = 0,
     hallucination_silence_threshold: Annotated[float | None, Form()] = None,
 ) -> Response | StreamingResponse:
