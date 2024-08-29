@@ -317,7 +317,22 @@ def transcribe_file_newton(
     ] = ["word"],
     stream: Annotated[bool, Form()] = False,
     hotwords: Annotated[str | None, Form()] = None,
+    repetition_penalty: Annotated[str | None, Form()] = None,
+    no_repeat_ngram_size: Annotated[int, Form()] = 0,
+    hallucination_silence_threshold: Annotated[float | None, Form()] = None,
 ) -> Response | StreamingResponse:
+    
+    logger.debug(f"model: {model}")
+    logger.debug(f"language: {language}")
+    logger.debug(f"prompt: {prompt}")
+    logger.debug(f"response_format: {response_format}")
+    logger.debug(f"timestamp_granularities: {timestamp_granularities}")
+    logger.debug(f"stream: {stream}")
+    logger.debug(f"hotwords: {hotwords}")
+    logger.debug(f"repetition_penalty: {repetition_penalty}")
+    logger.debug(f"no_repeat_ngram_size: {no_repeat_ngram_size}")
+    logger.debug(f"hallucination_silence_threshold: {hallucination_silence_threshold}")
+    
     whisper = load_model(model)
     segments, transcription_info = whisper.transcribe(
         file.file,
@@ -327,6 +342,9 @@ def transcribe_file_newton(
         word_timestamps="word" in timestamp_granularities,
         vad_filter=True,
         hotwords=hotwords,
+        repetition_penalty=repetition_penalty,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        hallucination_silence_threshold=hallucination_silence_threshold
     )
     segments = Segment.from_faster_whisper_segments(segments)
     if stream:
@@ -380,13 +398,6 @@ async def transcribe_stream(
         "vad_filter": False,
         "condition_on_previous_text": False,
     }
-    logger.debug(transcribe_opts)
-    logger.debug(language)
-    logger.debug(response_format)
-    logger.debug(model)
-    
-
-
     whisper = load_model(model)
     asr = FasterWhisperASR(whisper, **transcribe_opts)
     audio_stream = AudioStream()
