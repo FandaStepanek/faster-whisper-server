@@ -169,3 +169,6 @@ tests/data
 .secrets
 .ruff_cache
 .aider*
+
+examples/javascript/node_modules/*
+examples/javascript/package*
