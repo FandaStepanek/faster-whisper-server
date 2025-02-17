@@ -162,7 +162,7 @@ def transcribe_file(
     language: Annotated[str | None, Form()] = None,
     prompt: Annotated[str | None, Form()] = None,
     response_format: Annotated[ResponseFormat, Form()] = DEFAULT_RESPONSE_FORMAT,
-    temperature: Annotated[float, Form()] = 0.0,
+    #temperature: Annotated[float, Form()] = 0.0,
     timestamp_granularities: Annotated[
         TimestampGranularities,
         # WARN: `alias` doesn't actually work.
@@ -185,7 +185,7 @@ def transcribe_file(
             language=language,
             initial_prompt=prompt,
             word_timestamps="word" in timestamp_granularities,
-            temperature=temperature,
+            #temperature=temperature,
             vad_filter=vad_filter,
             hotwords=hotwords,
         )
