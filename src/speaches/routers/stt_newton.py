@@ -26,7 +26,7 @@ from speaches.text_utils import segments_to_srt, segments_to_text, segments_to_v
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["automatic-speech-recognition"])
+router = APIRouter(tags=["newton-automatic-speech-recognition"])
 
 type ResponseFormat = Literal["text", "json", "verbose_json", "srt", "vtt"]
 
