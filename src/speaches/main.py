@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(newton_stt_router)
 
     for route in app.routes:
-        print(f"Endpoint: {route.path} [{', '.join(route.methods)}]")
+        print(f"Endpoint: {route.path}")
 
 
     # HACK: move this elsewhere
