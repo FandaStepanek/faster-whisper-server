@@ -45,5 +45,5 @@ ENV HF_HUB_ENABLE_HF_TRANSFER=0
 # https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#donottrack
 # https://www.reddit.com/r/StableDiffusion/comments/1f6asvd/gradio_sends_ip_address_telemetry_by_default/
 ENV DO_NOT_TRACK=1
-EXPOSE 8000
+EXPOSE 8888
 CMD ["uvicorn", "--factory", "speaches.main:create_app"]
