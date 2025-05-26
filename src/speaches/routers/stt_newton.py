@@ -30,7 +30,7 @@ from speaches.text_utils import segments_to_srt, segments_to_text, segments_to_v
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["newton-automatic-speech-recognition"])
+router = APIRouter(tags=["automatic-speech-recognition"])
 
 type ResponseFormat = Literal["text", "json", "verbose_json", "srt", "vtt"]
 
@@ -96,7 +96,7 @@ def segments_to_streaming_response(
 
 
 @router.post(
-    "/v1/audio/translations",
+    "/v1/audio/newtonTranslations",
     response_model=str | CreateTranscriptionResponseJson | CreateTranscriptionResponseVerboseJson,
 )
 def translate_file(
