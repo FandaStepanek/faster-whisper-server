@@ -6,10 +6,12 @@ services:
       file: compose.yaml
       service: speaches
     # NOTE: slightly older cuda version is available under 'latest-cuda-12.4.1' tag
-    image: ghcr.io/speaches-ai/speaches:latest-cuda
+    # image: ghcr.io/speaches-ai/speaches:latest-cuda
+    image: ghcr.io/speaches-ai/speaches:latest-cuda-12.4.1
     build:
       args:
-        BASE_IMAGE: nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+        # BASE_IMAGE: nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+        BASE_IMAGE: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
     volumes:
       - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
     deploy:

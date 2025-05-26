@@ -35,6 +35,9 @@ from speaches.routers.stt import (
 from speaches.routers.vad import (
     router as vad_router,
 )
+from speaches.routers.stt_newton import (
+    router as newton_stt_router,
+)
 
 # https://swagger.io/docs/specification/v3_0/grouping-operations-with-tags/
 # https://fastapi.tiangolo.com/tutorial/metadata/#metadata-for-tags
@@ -72,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(realtime_ws_router)
     app.include_router(speech_router)
     app.include_router(vad_router)
+    app.include_router(newton_stt_router)
 
     # HACK: move this elsewhere
     app.get("/v1/realtime", include_in_schema=False)(lambda: RedirectResponse(url="/v1/realtime/"))
