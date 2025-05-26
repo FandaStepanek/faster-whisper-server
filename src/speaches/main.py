@@ -77,6 +77,10 @@ def create_app() -> FastAPI:
     app.include_router(vad_router)
     app.include_router(newton_stt_router)
 
+    for route in app.routes:
+        print(f"Endpoint: {route.path} [{', '.join(route.methods)}]")
+
+
     # HACK: move this elsewhere
     app.get("/v1/realtime", include_in_schema=False)(lambda: RedirectResponse(url="/v1/realtime/"))
     app.mount("/v1/realtime", StaticFiles(directory="realtime-console/dist", html=True))
