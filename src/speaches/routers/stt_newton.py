@@ -281,7 +281,6 @@ def transcribe_file(
                 initial_prompt=prompt,
                 word_timestamps="word" in timestamp_granularities,
                 vad_filter=vad_filter,
-                hotwords=hotwords,
             )
             # Convert faster-whisper segments to our format
             segments = TranscriptionSegment.from_faster_whisper_segments(segments)
