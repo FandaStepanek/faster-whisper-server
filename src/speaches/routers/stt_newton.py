@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Generator, Iterable, AsyncGenerator
+import json
 import logging
 from typing import Annotated, Literal, Optional
 
@@ -13,6 +14,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from faster_whisper.transcribe import BatchedInferencePipeline, TranscriptionInfo
 from huggingface_hub.utils._cache_manager import _scan_cached_repo
+from pydantic import ValidationError
 
 from speaches.api_types import (
     DEFAULT_TIMESTAMP_GRANULARITIES,
@@ -87,7 +89,7 @@ async def process_segment(
     
     Args:
         segment: The segment to process
-        hotwords: Optional comma-separated string of hotwords to apply
+        hotwords: JSON string containing array of hotwords (e.g. '["word1", "compound word"]')
         score_cutoff: Minimum similarity score (0-100) for fuzzy matching
         confidence_threshold: Base confidence threshold for word processing
         
@@ -96,8 +98,17 @@ async def process_segment(
     """
     if not hotwords or not segment.words:
         return segment
-        
-    hotword_list = [hw.strip() for hw in hotwords.split(",")]
+    
+    try:
+        hotword_list = json.loads(hotwords)
+        if not isinstance(hotword_list, list):
+            raise ValueError("Hotwords must be a JSON array")
+        if not all(isinstance(hw, str) for hw in hotword_list):
+            raise ValueError("All hotwords must be strings")
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning(f"Invalid hotwords format: {e}. Expected JSON array of strings.")
+        return segment
+
     processed_words = []
     modified = False
     
@@ -240,7 +251,7 @@ def transcribe_file(
         Form(alias="timestamp_granularities[]"),
     ] = ["segment"],
     stream: Annotated[bool, Form()] = False,
-    hotwords: Annotated[str | None, Form()] = None,
+    hotwords: Annotated[str | None, Form(description="JSON array of hotwords (e.g. '[\"word1\", \"compound word\"]')")] = None,
     score_cutoff: Annotated[float, Form()] = 85.0,
     confidence_threshold: Annotated[float, Form()] = 0.8,
     vad_filter: Annotated[bool, Form()] = False,
