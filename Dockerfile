@@ -20,17 +20,20 @@ ENV HOME=/home/ubuntu \
 WORKDIR $HOME/speaches
 # https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
 COPY --chown=ubuntu --from=ghcr.io/astral-sh/uv:0.7.5 /uv /bin/uv
-# NOTE: per https://docs.astral.sh/uv/guides/install-python, `uv` will automatically install the necessary python version 
-# https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-# https://docs.astral.sh/uv/guides/integration/docker/#compiling-bytecode
-# TODO: figure out if `/home/ubuntu/.cache/uv` should be used instead of `/root/.cache/uv`
+
+# First copy the package files
+COPY --chown=ubuntu . .
+
+# Install dependencies including the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --compile-bytecode --no-install-project
-COPY --chown=ubuntu . .
+    uv sync --frozen --compile-bytecode
+
+# Install UI dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --compile-bytecode --extra ui
+
 # Creating a directory for the cache to avoid the following error:
 # PermissionError: [Errno 13] Permission denied: '/home/ubuntu/.cache/huggingface/hub'
 # This error occurs because the volume is mounted as root and the `ubuntu` user doesn't have permission to write to it. Pre-creating the directory solves this issue.
