@@ -96,7 +96,15 @@ async def process_segment(
     Returns:
         Processed segment with modified words
     """
-    if not hotwords or not segment.words:
+    logger.info(f"Processing segment with text: '{segment.text}'")
+    logger.debug(f"Processing parameters: score_cutoff={score_cutoff}, confidence_threshold={confidence_threshold}")
+    
+    if not hotwords:
+        logger.debug("No hotwords provided, returning original segment")
+        return segment
+    
+    if not segment.words:
+        logger.debug("No words in segment, returning original segment")
         return segment
     
     try:
@@ -105,6 +113,7 @@ async def process_segment(
             raise ValueError("Hotwords must be a JSON array")
         if not all(isinstance(hw, str) for hw in hotword_list):
             raise ValueError("All hotwords must be strings")
+        logger.info(f"Loaded {len(hotword_list)} hotwords: {hotword_list}")
     except (json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Invalid hotwords format: {e}. Expected JSON array of strings.")
         return segment
@@ -113,6 +122,7 @@ async def process_segment(
     modified = False
     
     for i, word in enumerate(segment.words):
+        logger.debug(f"Processing word {i+1}/{len(segment.words)}: '{word.word}' (confidence: {word.probability:.3f})")
         context = get_word_context(segment.words, i)
         
         if should_process_word(word, context, confidence_threshold):
@@ -125,18 +135,26 @@ async def process_segment(
             
             if best_match:
                 # Create new word with the same timing but updated text and probability
+                new_probability = word.probability * score * (
+                    1.0 + (context.avg_segment_confidence - word.probability) * 0.2
+                )
+                logger.info(
+                    f"Replacing word '{word.word}' with '{best_match}' "
+                    f"(original conf: {word.probability:.3f}, new conf: {new_probability:.3f})"
+                )
                 new_word = TranscriptionWord(
                     start=word.start,
                     end=word.end,
                     word=best_match,
-                    # Combine original confidence with match score and context
-                    probability=word.probability * score * (
-                        1.0 + (context.avg_segment_confidence - word.probability) * 0.2
-                    )
+                    probability=new_probability
                 )
                 processed_words.append(new_word)
                 modified = True
                 continue
+            else:
+                logger.debug(f"No suitable hotword match found for '{word.word}'")
+        else:
+            logger.debug(f"Word '{word.word}' does not need processing")
         
         processed_words.append(word)
     
@@ -146,8 +164,10 @@ async def process_segment(
         new_segment.words = processed_words
         # Update segment text to reflect word changes
         new_segment.text = " ".join(word.word for word in processed_words)
+        logger.info(f"Modified segment text: '{new_segment.text}'")
         return new_segment
     
+    logger.debug("No modifications made to segment")
     return segment
 
 

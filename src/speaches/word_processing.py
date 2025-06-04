@@ -1,6 +1,7 @@
 """Word processing utilities for transcription enhancement."""
 
 from dataclasses import dataclass
+import logging
 from typing import Optional, Tuple
 
 from rapidfuzz import process as rapidfuzz_process
@@ -8,6 +9,7 @@ from rapidfuzz.distance import Levenshtein
 
 from speaches.api_types import TranscriptionWord
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class WordContext:
@@ -40,13 +42,22 @@ def get_word_context(
     Returns:
         WordContext object containing contextual information
     """
-    return WordContext(
+    context = WordContext(
         prev_word=words[current_idx - 1] if current_idx > 0 else None,
         next_word=words[current_idx + 1] if current_idx < len(words) - 1 else None,
         position_in_segment=current_idx,
         total_words=len(words),
         avg_segment_confidence=sum(w.probability for w in words) / len(words)
     )
+    logger.debug(
+        "Word context: pos=%d/%d, avg_conf=%.3f, prev='%s', next='%s'",
+        context.position_in_segment,
+        context.total_words,
+        context.avg_segment_confidence,
+        context.prev_word.word if context.prev_word else None,
+        context.next_word.word if context.next_word else None
+    )
+    return context
 
 
 def should_process_word(
@@ -64,17 +75,38 @@ def should_process_word(
     Returns:
         True if the word should be processed, False otherwise
     """
+    logger.debug(
+        "Checking word '%s' (conf=%.3f) against threshold %.3f",
+        word.word,
+        word.probability,
+        confidence_threshold
+    )
+    
     # Basic confidence check
     if word.probability >= confidence_threshold:
+        logger.debug("Word '%s' above confidence threshold, skipping", word.word)
         return False
         
     # If it's significantly lower confidence than segment average
     if word.probability < context.avg_segment_confidence * 0.7:
+        logger.debug(
+            "Word '%s' confidence (%.3f) significantly lower than segment average (%.3f)",
+            word.word,
+            word.probability,
+            context.avg_segment_confidence
+        )
         return True
         
     # If both neighboring words have much higher confidence
     if (context.prev_word and context.next_word and
         word.probability < min(context.prev_word.probability, context.next_word.probability) * 0.8):
+        logger.debug(
+            "Word '%s' confidence (%.3f) much lower than neighbors (prev=%.3f, next=%.3f)",
+            word.word,
+            word.probability,
+            context.prev_word.probability,
+            context.next_word.probability
+        )
         return True
         
     # If it's very short duration compared to neighbors
@@ -84,8 +116,15 @@ def should_process_word(
         next_duration = context.next_word.end - context.next_word.start
         avg_neighbor_duration = (prev_duration + next_duration) / 2
         if word_duration < avg_neighbor_duration * 0.5:
+            logger.debug(
+                "Word '%s' duration (%.3f) much shorter than neighbors avg (%.3f)",
+                word.word,
+                word_duration,
+                avg_neighbor_duration
+            )
             return True
             
+    logger.debug("Word '%s' does not need processing", word.word)
     return False
 
 
@@ -106,10 +145,18 @@ def find_best_hotword_match(
     Returns:
         Tuple of (best matching hotword or None, match score)
     """
+    logger.debug(
+        "Finding best match for word '%s' among %d hotwords (cutoff=%.1f)",
+        word.word,
+        len(hotwords),
+        score_cutoff
+    )
+    
     # Try exact match first
     word_lower = word.word.lower()
     for hotword in hotwords:
         if word_lower == hotword.lower():
+            logger.debug("Found exact match: '%s'", hotword)
             return hotword, 1.0
             
     # Check for compound words that might have been split
@@ -117,6 +164,11 @@ def find_best_hotword_match(
         compound = f"{word.word} {context.next_word.word}".lower()
         for hotword in hotwords:
             if compound == hotword.lower():
+                logger.debug(
+                    "Found compound word match: '%s' (from '%s')",
+                    hotword.split()[0],
+                    hotword
+                )
                 return hotword.split()[0], 1.0
                 
     # Try fuzzy matching with context-aware scoring
@@ -155,10 +207,19 @@ def find_best_hotword_match(
             
             final_score = base_score * context_score
             if final_score >= score_cutoff/100:
+                logger.debug(
+                    "Found fuzzy match: '%s' -> '%s' (score=%.3f)",
+                    word.word,
+                    hotword,
+                    final_score
+                )
                 matches.append((hotword, final_score))
     
     if matches:
         # Return the match with highest score
-        return max(matches, key=lambda x: x[1])
+        best_match = max(matches, key=lambda x: x[1])
+        logger.debug("Best match: '%s' (score=%.3f)", best_match[0], best_match[1])
+        return best_match
         
+    logger.debug("No matches found for word '%s'", word.word)
     return None, 0.0 
