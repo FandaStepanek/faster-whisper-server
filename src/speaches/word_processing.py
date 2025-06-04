@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 import logging
+import re
+import unicodedata
 from typing import Optional, Tuple
 
 from rapidfuzz import process as rapidfuzz_process
@@ -10,6 +12,29 @@ from rapidfuzz.distance import Levenshtein
 from speaches.api_types import TranscriptionWord
 
 logger = logging.getLogger(__name__)
+
+def normalize_word(word: str, remove_punctuation: bool = True) -> str:
+    """Normalize word by removing diacritics and optionally punctuation.
+    
+    Args:
+        word: Word to normalize
+        remove_punctuation: Whether to remove punctuation marks
+        
+    Returns:
+        Normalized word
+    """
+    # Remove diacritics
+    nfkd_form = unicodedata.normalize('NFKD', word)
+    word_without_diacritics = u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    
+    if remove_punctuation:
+        # Remove punctuation and whitespace
+        word_clean = re.sub(r'[^\w\s]', '', word_without_diacritics)
+    else:
+        word_clean = word_without_diacritics
+    
+    # Remove extra whitespace and convert to lowercase
+    return word_clean.strip().lower()
 
 @dataclass
 class WordContext:
@@ -87,17 +112,19 @@ def should_process_word(
     # If confidence is very high, only process if there's a potential exact hotword match
     if word.probability >= confidence_threshold:
         if hotwords:
-            word_lower = word.word.lower()
+            word_norm = normalize_word(word.word)
             # Check for exact matches or potential compound words
             for hotword in hotwords:
-                hotword_lower = hotword.lower()
-                if (word_lower in hotword_lower or 
+                hotword_norm = normalize_word(hotword)
+                if (word_norm in hotword_norm or 
                     (context.next_word and 
-                     f"{word_lower} {context.next_word.word.lower()}" in hotword_lower)):
+                     normalize_word(f"{word.word} {context.next_word.word}") in hotword_norm)):
                     logger.debug(
-                        "Word '%s' has high confidence but potential hotword match with '%s'",
+                        "Word '%s' (normalized: '%s') has high confidence but potential hotword match with '%s' (normalized: '%s')",
                         word.word,
-                        hotword
+                        word_norm,
+                        hotword,
+                        hotword_norm
                     )
                     return True
         logger.debug("Word '%s' above confidence threshold and no potential hotword matches, skipping", word.word)
@@ -147,17 +174,19 @@ def should_process_word(
             
     # Check for potential fuzzy matches with hotwords
     if hotwords:
-        word_lower = word.word.lower()
+        word_norm = normalize_word(word.word)
         for hotword in hotwords:
-            hotword_lower = hotword.lower()
+            hotword_norm = normalize_word(hotword)
             # Use a simple substring check as a quick pre-filter
-            if (len(word_lower) >= 3 and  # Only check words of reasonable length
-                (word_lower in hotword_lower or 
-                 any(w in hotword_lower for w in word_lower.split()))):
+            if (len(word_norm) >= 3 and  # Only check words of reasonable length
+                (word_norm in hotword_norm or hotword_norm in word_norm or
+                 any(w in hotword_norm for w in word_norm.split()))):
                 logger.debug(
-                    "Word '%s' has potential fuzzy match with hotword '%s'",
+                    "Word '%s' (normalized: '%s') has potential fuzzy match with hotword '%s' (normalized: '%s')",
                     word.word,
-                    hotword
+                    word_norm,
+                    hotword,
+                    hotword_norm
                 )
                 return True
             
@@ -189,32 +218,49 @@ def find_best_hotword_match(
         score_cutoff
     )
     
+    # Extract punctuation from the word to preserve it
+    word_text = word.word.strip()
+    punctuation_suffix = ''
+    if word_text and word_text[-1] in '.?!,;:':
+        punctuation_suffix = word_text[-1]
+        word_text = word_text[:-1].strip()
+    
+    # Create a mapping of normalized hotwords to their original forms
+    hotword_map = {normalize_word(hw): hw for hw in hotwords}
+    
     # Try exact match first
-    word_lower = word.word.lower()
-    for hotword in hotwords:
-        if word_lower == hotword.lower():
-            logger.debug("Found exact match: '%s'", hotword)
-            return hotword, 1.0
+    word_norm = normalize_word(word_text)
+    if word_norm in hotword_map:
+        result = hotword_map[word_norm] + punctuation_suffix
+        logger.debug(
+            "Found exact match: '%s' (normalized from '%s', original hotword: '%s')", 
+            result, 
+            word.word,
+            hotword_map[word_norm]
+        )
+        return result, 1.0
             
     # Check for compound words that might have been split
     if context.next_word:
-        compound = f"{word.word} {context.next_word.word}".lower()
-        for hotword in hotwords:
-            if compound == hotword.lower():
+        compound_norm = normalize_word(f"{word_text} {context.next_word.word}")
+        for norm_hotword, orig_hotword in hotword_map.items():
+            if compound_norm == norm_hotword:
+                result = orig_hotword.split()[0] + punctuation_suffix
                 logger.debug(
-                    "Found compound word match: '%s' (from '%s')",
-                    hotword.split()[0],
-                    hotword
+                    "Found compound word match: '%s' (normalized from '%s', original hotword: '%s')",
+                    result,
+                    word.word,
+                    orig_hotword
                 )
-                return hotword.split()[0], 1.0
+                return result, 1.0
                 
     # Try fuzzy matching with context-aware scoring
     matches = []
-    for hotword in hotwords:
+    for norm_hotword, orig_hotword in hotword_map.items():
         # Basic fuzzy match score
         match = rapidfuzz_process.extractOne(
-            word.word,
-            [hotword],
+            word_norm,
+            [norm_hotword],
             scorer=Levenshtein.normalized_similarity,
             score_cutoff=score_cutoff/100
         )
@@ -228,14 +274,14 @@ def find_best_hotword_match(
                 # Check if this hotword commonly appears with neighboring words
                 neighbor_match = max(
                     rapidfuzz_process.extractOne(
-                        f"{context.prev_word.word} {hotword}",
-                        [hotword],
+                        normalize_word(f"{context.prev_word.word} {orig_hotword}"),
+                        [norm_hotword],
                         scorer=Levenshtein.normalized_similarity,
                         score_cutoff=0
                     )[1],
                     rapidfuzz_process.extractOne(
-                        f"{hotword} {context.next_word.word}",
-                        [hotword],
+                        normalize_word(f"{orig_hotword} {context.next_word.word}"),
+                        [norm_hotword],
                         scorer=Levenshtein.normalized_similarity,
                         score_cutoff=0
                     )[1]
@@ -244,13 +290,15 @@ def find_best_hotword_match(
             
             final_score = base_score * context_score
             if final_score >= score_cutoff/100:
+                result = orig_hotword + punctuation_suffix
                 logger.debug(
-                    "Found fuzzy match: '%s' -> '%s' (score=%.3f)",
+                    "Found fuzzy match: '%s' -> '%s' (score=%.3f, original hotword: '%s')",
                     word.word,
-                    hotword,
-                    final_score
+                    result,
+                    final_score,
+                    orig_hotword
                 )
-                matches.append((hotword, final_score))
+                matches.append((result, final_score))
     
     if matches:
         # Return the match with highest score
