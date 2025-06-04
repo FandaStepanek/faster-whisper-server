@@ -1,7 +1,7 @@
 import asyncio
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, AsyncGenerator
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 from fastapi import (
     APIRouter,
@@ -21,12 +21,18 @@ from speaches.api_types import (
     CreateTranscriptionResponseVerboseJson,
     TimestampGranularities,
     TranscriptionSegment,
+    TranscriptionWord,
 )
 from speaches.dependencies import AudioFileDependency, ConfigDependency, WhisperModelManagerDependency
 from speaches.executors.whisper import utils as whisper_utils
 from speaches.hf_utils import get_model_card_data_from_cached_repo_info, get_model_repo_path
 from speaches.model_aliases import ModelId
 from speaches.text_utils import segments_to_srt, segments_to_text, segments_to_vtt
+from speaches.word_processing import (
+    get_word_context,
+    should_process_word,
+    find_best_hotword_match,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,25 +77,99 @@ def format_as_sse(data: str) -> str:
     return f"{data}\n\n"
 
 
+async def process_segment(
+    segment: TranscriptionSegment,
+    hotwords: str | None = None,
+    score_cutoff: float = 85.0,
+    confidence_threshold: float = 0.8
+) -> TranscriptionSegment:
+    """Post-process a single transcription segment using fuzzy matching with context awareness.
+    
+    Args:
+        segment: The segment to process
+        hotwords: Optional comma-separated string of hotwords to apply
+        score_cutoff: Minimum similarity score (0-100) for fuzzy matching
+        confidence_threshold: Base confidence threshold for word processing
+        
+    Returns:
+        Processed segment with modified words
+    """
+    if not hotwords or not segment.words:
+        return segment
+        
+    hotword_list = [hw.strip() for hw in hotwords.split(",")]
+    processed_words = []
+    modified = False
+    
+    for i, word in enumerate(segment.words):
+        context = get_word_context(segment.words, i)
+        
+        if should_process_word(word, context, confidence_threshold):
+            best_match, score = find_best_hotword_match(
+                word,
+                context,
+                hotword_list,
+                score_cutoff
+            )
+            
+            if best_match:
+                # Create new word with the same timing but updated text and probability
+                new_word = TranscriptionWord(
+                    start=word.start,
+                    end=word.end,
+                    word=best_match,
+                    # Combine original confidence with match score and context
+                    probability=word.probability * score * (
+                        1.0 + (context.avg_segment_confidence - word.probability) * 0.2
+                    )
+                )
+                processed_words.append(new_word)
+                modified = True
+                continue
+        
+        processed_words.append(word)
+    
+    if modified:
+        # Create new segment with modified words
+        new_segment = segment.model_copy()
+        new_segment.words = processed_words
+        # Update segment text to reflect word changes
+        new_segment.text = " ".join(word.word for word in processed_words)
+        return new_segment
+    
+    return segment
+
+
 def segments_to_streaming_response(
     segments: Iterable[TranscriptionSegment],
     transcription_info: TranscriptionInfo,
     response_format: ResponseFormat,
+    hotwords: str | None = None,
+    score_cutoff: float = 85.0,
+    confidence_threshold: float = 0.8,
 ) -> StreamingResponse:
-    def segment_responses() -> Generator[str, None, None]:
+    async def segment_responses() -> AsyncGenerator[str, None]:
         for i, segment in enumerate(segments):
+            # Apply post-processing to each segment as it arrives
+            processed_segment = await process_segment(
+                segment, 
+                hotwords, 
+                score_cutoff,
+                confidence_threshold
+            )
+            
             if response_format == "text":
-                data = segment.text
+                data = processed_segment.text
             elif response_format == "json":
-                data = CreateTranscriptionResponseJson.from_segments([segment]).model_dump_json()
+                data = CreateTranscriptionResponseJson.from_segments([processed_segment]).model_dump_json()
             elif response_format == "verbose_json":
                 data = CreateTranscriptionResponseVerboseJson.from_segment(
-                    segment, transcription_info
+                    processed_segment, transcription_info
                 ).model_dump_json()
             elif response_format == "vtt":
-                data = segments_to_vtt(segment, i)
+                data = segments_to_vtt(processed_segment, i)
             elif response_format == "srt":
-                data = segments_to_srt(segment, i)
+                data = segments_to_srt(processed_segment, i)
             yield format_as_sse(data)
 
     return StreamingResponse(segment_responses(), media_type="text/event-stream")
@@ -139,7 +219,7 @@ async def get_timestamp_granularities(request: Request) -> TimestampGranularitie
     return timestamp_granularities
 
 
-# https://platform.openai.com/docs/api-reference/audio/createTranscription
+ # https://platform.openai.com/docs/api-reference/audio/createTranscription
 # https://github.com/openai/openai-openapi/blob/master/openapi.yaml#L8915
 @router.post(
     "/v1/audio/newtonTranscriptions",
@@ -161,6 +241,8 @@ def transcribe_file(
     ] = ["segment"],
     stream: Annotated[bool, Form()] = False,
     hotwords: Annotated[str | None, Form()] = None,
+    score_cutoff: Annotated[float, Form()] = 85.0,
+    confidence_threshold: Annotated[float, Form()] = 0.8,
     vad_filter: Annotated[bool, Form()] = False,
 ) -> Response | StreamingResponse:
     timestamp_granularities = asyncio.run(get_timestamp_granularities(request))
@@ -190,12 +272,29 @@ def transcribe_file(
                 vad_filter=vad_filter,
                 hotwords=hotwords,
             )
+            # Convert faster-whisper segments to our format
             segments = TranscriptionSegment.from_faster_whisper_segments(segments)
 
             if stream:
-                return segments_to_streaming_response(segments, transcription_info, response_format)
+                return segments_to_streaming_response(
+                    segments, 
+                    transcription_info, 
+                    response_format, 
+                    hotwords,
+                    score_cutoff,
+                    confidence_threshold
+                )
             else:
-                return segments_to_response(segments, transcription_info, response_format)
+                processed_segments = []
+                for segment in segments:
+                    processed_segment = asyncio.run(process_segment(
+                        segment, 
+                        hotwords,
+                        score_cutoff,
+                        confidence_threshold
+                    ))
+                    processed_segments.append(processed_segment)
+                return segments_to_response(processed_segments, transcription_info, response_format)
     else:
         raise HTTPException(
             status_code=404,
