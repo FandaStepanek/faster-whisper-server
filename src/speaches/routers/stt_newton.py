@@ -282,6 +282,11 @@ def transcribe_file(
             "It only makes sense to provide `timestamp_granularities[]` when `response_format` is set to `verbose_json`. See https://platform.openai.com/docs/api-reference/audio/createTranscription#audio-createtranscription-timestamp_granularities."
         )
 
+    # Always add "word" to timestamp_granularities if hotwords are provided
+    if hotwords and "word" not in timestamp_granularities:
+        logger.info("Adding 'word' to timestamp_granularities since hotwords are provided")
+        timestamp_granularities = ["word", "segment"]  # Use valid combination from TIMESTAMP_GRANULARITIES_COMBINATIONS
+
     model_repo_path = get_model_repo_path(model)
     if model_repo_path is None:
         raise HTTPException(
@@ -299,7 +304,7 @@ def transcribe_file(
                 task="transcribe",
                 language=language,
                 initial_prompt=prompt,
-                word_timestamps="word" in timestamp_granularities,
+                word_timestamps=True,
                 vad_filter=vad_filter,
             )
             # Convert faster-whisper segments to our format
