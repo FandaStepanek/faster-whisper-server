@@ -228,9 +228,28 @@ def find_best_hotword_match(
     # Create a mapping of normalized hotwords to their original forms
     hotword_map = {normalize_word(hw): hw for hw in hotwords}
     
+    # Check if this word was already matched in recent context
+    recent_match = False
+    if context.prev_word and context.prev_word.word == word.word:
+        logger.debug("Skipping duplicate word '%s' - matched in previous position", word.word)
+        return None, 0.0
+        
     # Try exact match first
     word_norm = normalize_word(word_text)
     if word_norm in hotword_map:
+        # Check if next word would also match - if so, this might be part of a compound
+        if context.next_word:
+            next_norm = normalize_word(context.next_word.word)
+            compound_norm = normalize_word(f"{word_text} {context.next_word.word}")
+            for norm_hotword in hotword_map:
+                if compound_norm == norm_hotword:
+                    # Skip this match as it will be handled as part of compound
+                    logger.debug(
+                        "Skipping individual match '%s' as it's part of compound word",
+                        word.word
+                    )
+                    return None, 0.0
+                    
         result = hotword_map[word_norm] + punctuation_suffix
         logger.debug(
             "Found exact match: '%s' (normalized from '%s', original hotword: '%s')", 
@@ -257,6 +276,10 @@ def find_best_hotword_match(
     # Try fuzzy matching with context-aware scoring
     matches = []
     for norm_hotword, orig_hotword in hotword_map.items():
+        # Skip fuzzy matching if the lengths are too different
+        if abs(len(word_norm) - len(norm_hotword)) > 2:
+            continue
+            
         # Basic fuzzy match score
         match = rapidfuzz_process.extractOne(
             word_norm,
@@ -269,6 +292,10 @@ def find_best_hotword_match(
             base_score = match[1]
             context_score = 1.0
             
+            # Penalize matches that would create duplicates
+            if context.prev_word and normalize_word(context.prev_word.word) == norm_hotword:
+                context_score *= 0.5
+                
             # Boost score if neighboring words support this match
             if context.prev_word and context.next_word:
                 # Check if this hotword commonly appears with neighboring words
@@ -289,7 +316,13 @@ def find_best_hotword_match(
                 context_score += neighbor_match * 0.2
             
             final_score = base_score * context_score
-            if final_score >= score_cutoff/100:
+            
+            # Require higher score for fuzzy matches of short words
+            min_score = score_cutoff/100
+            if len(word_norm) <= 3:
+                min_score *= 1.2
+                
+            if final_score >= min_score:
                 result = orig_hotword + punctuation_suffix
                 logger.debug(
                     "Found fuzzy match: '%s' -> '%s' (score=%.3f, original hotword: '%s')",
