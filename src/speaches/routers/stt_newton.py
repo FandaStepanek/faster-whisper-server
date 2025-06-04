@@ -269,7 +269,7 @@ def transcribe_file(
         TimestampGranularities,
         # WARN: `alias` doesn't actually work.
         Form(alias="timestamp_granularities[]"),
-    ] = ["segment"],
+    ] = ["word"],
     stream: Annotated[bool, Form()] = False,
     hotwords: Annotated[str | None, Form(description="JSON array of hotwords (e.g. '[\"word1\", \"compound word\"]')")] = None,
     score_cutoff: Annotated[float, Form()] = 85.0,
