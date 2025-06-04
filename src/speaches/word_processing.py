@@ -63,7 +63,8 @@ def get_word_context(
 def should_process_word(
     word: TranscriptionWord,
     context: WordContext,
-    confidence_threshold: float
+    confidence_threshold: float,
+    hotwords: list[str] | None = None
 ) -> bool:
     """Determine if a word should be processed based on various factors.
     
@@ -71,6 +72,7 @@ def should_process_word(
         word: The word to check
         context: Contextual information about the word
         confidence_threshold: Base confidence threshold
+        hotwords: List of hotwords to check for potential matches
         
     Returns:
         True if the word should be processed, False otherwise
@@ -82,26 +84,45 @@ def should_process_word(
         confidence_threshold
     )
     
-    # Basic confidence check
+    # If confidence is very high, only process if there's a potential exact hotword match
     if word.probability >= confidence_threshold:
-        logger.debug("Word '%s' above confidence threshold, skipping", word.word)
+        if hotwords:
+            word_lower = word.word.lower()
+            # Check for exact matches or potential compound words
+            for hotword in hotwords:
+                hotword_lower = hotword.lower()
+                if (word_lower in hotword_lower or 
+                    (context.next_word and 
+                     f"{word_lower} {context.next_word.word.lower()}" in hotword_lower)):
+                    logger.debug(
+                        "Word '%s' has high confidence but potential hotword match with '%s'",
+                        word.word,
+                        hotword
+                    )
+                    return True
+        logger.debug("Word '%s' above confidence threshold and no potential hotword matches, skipping", word.word)
         return False
         
+    # Always process words with very low confidence
+    if word.probability < 0.5:
+        logger.debug("Word '%s' has very low confidence, will process", word.word)
+        return True
+        
     # If it's significantly lower confidence than segment average
-    if word.probability < context.avg_segment_confidence * 0.7:
+    if word.probability < context.avg_segment_confidence * 0.8:  # Relaxed from 0.7
         logger.debug(
-            "Word '%s' confidence (%.3f) significantly lower than segment average (%.3f)",
+            "Word '%s' confidence (%.3f) lower than segment average (%.3f)",
             word.word,
             word.probability,
             context.avg_segment_confidence
         )
         return True
         
-    # If both neighboring words have much higher confidence
+    # If neighboring words have higher confidence
     if (context.prev_word and context.next_word and
-        word.probability < min(context.prev_word.probability, context.next_word.probability) * 0.8):
+        word.probability < min(context.prev_word.probability, context.next_word.probability) * 0.9):  # Relaxed from 0.8
         logger.debug(
-            "Word '%s' confidence (%.3f) much lower than neighbors (prev=%.3f, next=%.3f)",
+            "Word '%s' confidence (%.3f) lower than neighbors (prev=%.3f, next=%.3f)",
             word.word,
             word.probability,
             context.prev_word.probability,
@@ -109,20 +130,36 @@ def should_process_word(
         )
         return True
         
-    # If it's very short duration compared to neighbors
+    # If it's short duration compared to neighbors
     if context.prev_word and context.next_word:
         word_duration = word.end - word.start
         prev_duration = context.prev_word.end - context.prev_word.start
         next_duration = context.next_word.end - context.next_word.start
         avg_neighbor_duration = (prev_duration + next_duration) / 2
-        if word_duration < avg_neighbor_duration * 0.5:
+        if word_duration < avg_neighbor_duration * 0.6:  # Relaxed from 0.5
             logger.debug(
-                "Word '%s' duration (%.3f) much shorter than neighbors avg (%.3f)",
+                "Word '%s' duration (%.3f) shorter than neighbors avg (%.3f)",
                 word.word,
                 word_duration,
                 avg_neighbor_duration
             )
             return True
+            
+    # Check for potential fuzzy matches with hotwords
+    if hotwords:
+        word_lower = word.word.lower()
+        for hotword in hotwords:
+            hotword_lower = hotword.lower()
+            # Use a simple substring check as a quick pre-filter
+            if (len(word_lower) >= 3 and  # Only check words of reasonable length
+                (word_lower in hotword_lower or 
+                 any(w in hotword_lower for w in word_lower.split()))):
+                logger.debug(
+                    "Word '%s' has potential fuzzy match with hotword '%s'",
+                    word.word,
+                    hotword
+                )
+                return True
             
     logger.debug("Word '%s' does not need processing", word.word)
     return False

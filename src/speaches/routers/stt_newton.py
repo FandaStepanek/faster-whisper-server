@@ -125,7 +125,7 @@ async def process_segment(
         logger.debug(f"Processing word {i+1}/{len(segment.words)}: '{word.word}' (confidence: {word.probability:.3f})")
         context = get_word_context(segment.words, i)
         
-        if should_process_word(word, context, confidence_threshold):
+        if should_process_word(word, context, confidence_threshold, hotword_list):
             best_match, score = find_best_hotword_match(
                 word,
                 context,
