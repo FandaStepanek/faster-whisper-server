@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # This error occurs because the volume is mounted as root and the `ubuntu` user doesn't have permission to write to it. Pre-creating the directory solves this issue.
 RUN mkdir -p $HOME/.cache/huggingface/hub
 ENV UVICORN_HOST=0.0.0.0
-ENV UVICORN_PORT=8000
+ENV UVICORN_PORT=8777
 ENV PATH="$HOME/speaches/.venv/bin:$PATH"
 # https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hfhubenablehftransfer
 # NOTE: I've disabled this because it doesn't inside of Docker container. I couldn't pinpoint the exact reason. This doesn't happen when running the server locally.
@@ -48,5 +48,5 @@ ENV DO_NOT_TRACK=1
 ENV GRADIO_ANALYTICS_ENABLED="False"
 ENV DISABLE_TELEMETRY=1
 ENV HF_HUB_DISABLE_TELEMETRY=1
-EXPOSE 8000
+EXPOSE 8777
 CMD ["uvicorn", "--factory", "speaches.main:create_app"]

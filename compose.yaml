@@ -9,7 +9,7 @@ services:
         - linux/arm64
     restart: unless-stopped
     ports:
-      - 8000:8000
+      - 8777:8777
     develop:
       watch:
         - action: rebuild
@@ -21,7 +21,7 @@ services:
       - path: .env
         required: false
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://0.0.0.0:8000/health"] # TODO: won't work if a user changes the port
+      test: ["CMD", "curl", "--fail", "http://0.0.0.0:8777/health"] # TODO: won't work if a user changes the port
       interval: 30s
       timeout: 10s
       retries: 3
